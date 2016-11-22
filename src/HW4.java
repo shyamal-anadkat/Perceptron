@@ -6,7 +6,7 @@ import java.math.RoundingMode;
 ///////////////////////////////
 // Shyamal H Anadkat        ///                     
 // HW4 - Perceptron         ///
-// CS540 (Shavlik)          ///                                                        
+// CS540 (JudeShavlik)      ///                                                        
 ///////////////////////////////
 
 public class HW4
@@ -61,7 +61,6 @@ public class HW4
 
 		Vector<Double> bestModel = null;
 		int epoche = 0;int step = 50;
-
 		while(epoche != maxEpoche) {
 			epoche = epoche+50;
 			trainPerceptron(trainSet, learnedModel, step);
