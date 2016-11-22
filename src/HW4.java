@@ -1,5 +1,7 @@
 import java.util.*;
 import java.io.*;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 ///////////////////////////////
 // Shyamal H Anadkat        ///                     
@@ -18,9 +20,9 @@ public class HW4
 	public static List<String> firstVals = new ArrayList<String>();
 	public static List<String> secondVals = new ArrayList<String>();
 	static int numInputs = 0;
-
-	static int epoche = 200;
-	static final boolean DEBUG = true;
+	static int maxEpoche = 1000;
+	static final boolean DEBUG = false;
+	/*****************************************************************/
 
 	//RANDOM INSTANCE//
 	public static Random randomInstance = new Random(540); // Change 540 to another integer to get different results.
@@ -28,13 +30,12 @@ public class HW4
 		// Recall one can permute a list of examples by
 		//    (a) assigning a random number to each example,
 		//    (b) sort based on these assigned numbers, and
-		//     (c) remove the random numbers (actually, could just keep them in your Example class, but don't use these as a feature during learning!)
+		//    (c) remove the random numbers (actually, could just keep them in your Example class, but don't use these as a feature during learning!)
 		return randomInstance.nextDouble();
 	}
-	/*****************************************************************/
+
 
 	public static void main(String[] args)
-
 	{   
 		if (args.length != 3) {
 			System.err.println("Please supply 3 filenames on the " +
@@ -44,30 +45,61 @@ public class HW4
 		}
 
 		//initialize and read tune and testset examples for red-wine-quality. 
+		System.out.println("WELCOME TO CS540 PERCEPTRON - SHYAMAL ANADKAT");
+		System.out.println("---------------------------------------------");
 		trainSet.ReadInExamplesFromFile(args[0]);
 		tuneSet.ReadInExamplesFromFile(args[1]);
 		testSet.ReadInExamplesFromFile(args[2]);
+
 		numInputs = trainSet.getNumberOfFeatures() + 1;
+		int maxEpochForTune= 50;
+		Double maxTune= 0.0,maxTest=0.0;
 
+		//initialize vector for learning model, this will store weights
 		Vector<Double> learnedModel = new Vector<Double>();
-		initWeightsInPerceptron(learnedModel, 0.0, numInputs);
-		trainPerceptron(trainSet, learnedModel);
+		initWeightsInPerceptron(learnedModel, 0.0, numInputs); //initialize all with 0
 
-		System.out.println("DONE LEARNING PERCEPTRON...OUTPUTTING STATS");
-		System.out.println("++++++++++++++++++++++++++++");
-		System.out.println("EPOCH: "+epoche);
-		System.out.println("Weights: "+learnedModel);
-		System.out.println("For train set: "+testPerceptron(learnedModel, trainSet, trainSet));
-		System.out.println("For tune set: "+testPerceptron(learnedModel, tuneSet, trainSet));
-		System.out.println("For test set: "+testPerceptron(learnedModel, testSet, trainSet));
-		System.out.println("++++++++++++++++++++++++++++");
+		Vector<Double> bestModel = null;
+		int epoche = 0;int step = 50;
 
-		if(!DEBUG) {
+		while(epoche != maxEpoche) {
+			epoche = epoche+50;
+			trainPerceptron(trainSet, learnedModel, step);
+			System.out.println("++++++++++++++++++++++++++++++++++++++++++++++++");
+			System.out.println("Epoche: "+epoche);
+			System.out.println("Weights: "+learnedModel);
+			Double currTest = testPerceptron(learnedModel, testSet, trainSet);
+			Double currTrain = testPerceptron(learnedModel, trainSet, trainSet);
+			Double currTune = testPerceptron(learnedModel, tuneSet, trainSet);
+			//print percent accuracies rounded to 5 decimal places 
+			System.out.println("Accuracy for train set: "+Utilities.round(currTrain, 5)+"%");
+			System.out.println("Accuracy for tune set: "+Utilities.round(currTune, 5)+"%");
+			System.out.println("Accuracy for test set: "+Utilities.round(currTest, 5)+"%");
+			//getting perceptron with best tune 
+			if(currTune > maxTune) {
+				maxTune = currTune; 
+				maxEpochForTune = epoche;
+				maxTest = currTest;
+				bestModel = new Vector(learnedModel); //update best model/perceptron here
+			};
+		}
+		System.out.println("++++++++++++++++++++++++++++++++++++++++++++++++");
+		//print out weights and features for best perceptron
+		for(int i = 0; i < trainSet.getNumberOfFeatures(); i ++) {
+			System.out.println(i+1+") Wgt = "+Utilities.round(bestModel.get(i), 3)+" | "+trainSet.getFeatures()[i].getName());
+		}
+		System.out.println("Threshold: "+bestModel.get(bestModel.size()-1));
+		System.out.println("////////////////////////////////////////////////////////");
+		System.out.println("Max Epoche for Tune:"+maxEpochForTune+" at "+maxTune+"%");
+		System.out.println("Max Test Accuracy here: "+maxTest+"%");
+
+		//outdated debug
+		if(DEBUG) {
 			System.out.println("Number of inputs to perceptron: "+numInputs);
 			System.out.println("Size of learned model: "+ learnedModel.size());
-			//tuneSet.DescribeDataset();
+			tuneSet.DescribeDataset();
 			trainSet.DescribeDataset();
-			//testSet.DescribeDataset();
+			testSet.DescribeDataset();
 		}
 
 		System.out.println("---------------------------------");
@@ -79,18 +111,18 @@ public class HW4
 	 * @param loe
 	 * @param model
 	 */
-	public static void trainPerceptron(ListOfExamples loe, Vector<Double> model){
-
+	public static void trainPerceptron(ListOfExamples loe, Vector<Double> model, int epoche){
+		//run it for num epoches (steps of 50, could vary)
 		for(int y = 0; y < epoche; y ++){
-			loe = permuteOrder(loe);
+			loe = permuteOrder(loe);  //permuting order of the list 
 			for(int ex = 0; ex < loe.size(); ex++) {
 				ArrayList<Double> inputs = new ArrayList<Double>();
-				Example curr = loe.get(ex);
+				Example curr = loe.get(ex); //curr example
+
 				int y_out = curr.getLabel().equals(loe.getOutputLabels().getFirstValue()) ? 0:1;
-				for(int i = 0; i < curr.size(); i++) {
+				for(int i = 0; i < curr.size(); i++) { //populate inputs with feature vals
 					inputs.add(firstVals.contains(curr.get(i)) ? 0.0:1.0);
 				}
-
 				Double weightedInput = getWeightedSum(model, inputs);
 				int hyp_out = weightedInput >= model.get(model.size()-1) ? 1:0;
 				//System.out.println(hyp_out+"-"+y_out);
@@ -98,8 +130,9 @@ public class HW4
 					//update the weights and learn 
 					for(int i = 0; i < model.size() - 1 ; i++) {
 						Double deltaW = ALPHA_RATE * (double)(y_out - hyp_out) * inputs.get(i) ; 
-						model.set(i, (model.get(i) + deltaW));
+						model.set(i, (double)(model.get(i) + deltaW));
 					}
+					//update threshold which is the last value in learnedModel
 					Double thresholdDelta = ALPHA_RATE * (double)(y_out - hyp_out) * -1 ;
 					model.set(model.size()-1, (model.get(model.size()-1)+thresholdDelta));
 				}
@@ -113,7 +146,7 @@ public class HW4
 	 * @param test_loe
 	 * @param train
 	 */
-	public static String testPerceptron(Vector<Double> model, ListOfExamples test_loe, ListOfExamples train) {
+	public static Double testPerceptron(Vector<Double> model, ListOfExamples test_loe, ListOfExamples train) {
 		int positives = 0; 
 		for(int x = 0; x < test_loe.size(); x++) {
 			Example curr = test_loe.get(x);
@@ -122,7 +155,7 @@ public class HW4
 				positives++;
 			}
 		}
-		return "Percent Success: "+(double)positives/test_loe.size()*100+"%";
+		return (double)positives/test_loe.size()*100;
 	}
 
 	/**
@@ -174,42 +207,11 @@ public class HW4
 			retVal = retVal + (inp.get(i) * weights.get(i));
 		}
 		// for the -1 unit / BIAS
-		//retVal += (inp.get(inp.size()-1) * weights.get(weights.size()-1));
+		retVal += (inp.get(inp.size()-1) * weights.get(weights.size()-1));
 		retVal += (-1 * weights.get(weights.size() - 1));
 		return retVal; 
 	}
 
-	/**
-	 * Counts the number of particular value in feature 
-	 * @param value
-	 * @param set
-	 * @param idx
-	 * @return
-	 */
-	public static int attributeInFeatureCnt(String value, ListOfExamples set, int idx) {
-		int retVal = 0;
-		for(int i = 0; i < set.size(); i++) { //all examples 
-			if(set.get(i).get(idx).equalsIgnoreCase(value)) {
-				retVal++;
-			}
-		}
-		return retVal;
-	}
-
-	/**
-	 * Returns index of feature name. 
-	 * @param set
-	 * @param feature
-	 * @return
-	 */
-	public static int getIndexOfFeature(ListOfExamples set, String feature) {
-		for(int i = 0; i < set.getNumberOfFeatures(); i ++) {
-			if(feature.equalsIgnoreCase(set.getFeatureName(i))) {
-				return i;
-			}
-		}
-		return -1;
-	}
 }
 
 // This class, an extension of ArrayList, holds an individual example.
@@ -242,8 +244,6 @@ class Example extends ArrayList<String>
 			+ " = " +  this.get(i) + "\n");
 		}
 	}
-
-
 
 	// Adds a feature value to the example.
 	public void addFeatureValue(String value) {
@@ -358,25 +358,6 @@ class ListOfExamples extends ArrayList<Example>
 	 */
 	public BinaryFeature getOutputLabels() {
 		return this.outputLabel;
-	}
-
-	/**
-	 * Gets count for particular attribute from label 
-	 * @param label
-	 * @param index
-	 * @param attrVal
-	 * @return
-	 */
-	//eg : 4 of the red are positive 
-	public int getAttributeForLabelCnt(String label, int index, String attrVal) {
-		int retVal = 0;
-		for(int i = 0; i < size(); i ++) {
-			if(this.get(i).getLabel().equalsIgnoreCase(label)) {// for that label 
-				if(this.get(i).get(index).equalsIgnoreCase(attrVal))
-					retVal++;
-			}
-		}
-		return retVal;
 	}
 
 	public void filterExample(Example ex){
@@ -602,5 +583,12 @@ class Utilities
 		System.out.print("\n" + msg);
 		try { System.in.read(); }
 		catch(Exception e) {} // Ignore any errors while reading.
+	}
+	public static double round(double value, int places) {
+		if (places < 0) throw new IllegalArgumentException();
+
+		BigDecimal bd = new BigDecimal(value);
+		bd = bd.setScale(places, RoundingMode.HALF_UP);
+		return bd.doubleValue();
 	}
 }
